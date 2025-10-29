@@ -165,8 +165,8 @@ export function useRealtimeVoice(options?: UseRealtimeVoiceOptions): UseRealtime
             tools: [
               {
                 type: 'function',
-                name: 'change_color',
-                description: 'changes the color of Craig. Craig uses this to express his emotions',
+                name: 'change_orb_color',
+                description: 'Changes the color of Craig to a single color.',
                 parameters: {
                   type: 'object',
                   properties: {
@@ -176,6 +176,60 @@ export function useRealtimeVoice(options?: UseRealtimeVoiceOptions): UseRealtime
                     },
                   },
                   required: ['color'],
+                },
+              },
+              {
+                type: 'function',
+                name: 'set_multiple_colors',
+                description: 'Sets multiple colors for Craig to create a gradient or multi-color effect.',
+                parameters: {
+                  type: 'object',
+                  properties: {
+                    colors: {
+                      type: 'array',
+                      items: {
+                        type: 'string',
+                      },
+                      description: 'An array of 2-5 color names (e.g., ["red", "blue", "green"])',
+                    },
+                  },
+                  required: ['colors'],
+                },
+              },
+              {
+                type: 'function',
+                name: 'express_frustration',
+                description: 'Makes Craig express frustration with more erratic and noisy movement for 3 seconds. Use when Craig is frustrated, annoyed, or upset.',
+                parameters: {
+                  type: 'object',
+                  properties: {},
+                },
+              },
+              {
+                type: 'function',
+                name: 'express_embarrassment',
+                description: 'Use when Craig feels embarrassed, shy, or self-conscious.',
+                parameters: {
+                  type: 'object',
+                  properties: {},
+                },
+              },
+              {
+                type: 'function',
+                name: 'express_excitement',
+                description: 'Use when Craig feels excited, thrilled, or energetic.',
+                parameters: {
+                  type: 'object',
+                  properties: {},
+                },
+              },
+              {
+                type: 'function',
+                name: 'express_sadness',
+                description: 'Use when Craig feels sad, disappointed, or down.',
+                parameters: {
+                  type: 'object',
+                  properties: {},
                 },
               },
             ],

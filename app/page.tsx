@@ -25,16 +25,58 @@ const COLOR_MAP: Record<string, string> = {
 };
 
 export default function Home() {
-  const [orbColor, setOrbColor] = useState('#000000');
+  const [orbColors, setOrbColors] = useState(['#000000']);
+  const [isFrustrated, setIsFrustrated] = useState(false);
+  const [isEmbarrassed, setIsEmbarrassed] = useState(false);
+  const [isExcited, setIsExcited] = useState(false);
+  const [isSad, setIsSad] = useState(false);
 
   const { isConnected, isConnecting, audioLevel, error, connect, disconnect } = useRealtimeVoice({
     onToolCall: (toolName, args) => {
       if (toolName === 'change_orb_color') {
         const colorName = args.color.toLowerCase();
         const hexColor = COLOR_MAP[colorName] || args.color;
-        setOrbColor(hexColor);
+        setOrbColors([hexColor]);
         return { success: true, message: `Changed orb color to ${args.color}` };
       }
+
+      if (toolName === 'set_multiple_colors') {
+        const hexColors = args.colors.map((colorName: string) => {
+          const name = colorName.toLowerCase();
+          return COLOR_MAP[name] || colorName;
+        });
+        setOrbColors(hexColors);
+        return { success: true, message: `Changed orb to ${args.colors.length} colors: ${args.colors.join(', ')}` };
+      }
+
+      if (toolName === 'express_frustration') {
+        setIsFrustrated(true);
+        // Reset after 3 seconds
+        setTimeout(() => setIsFrustrated(false), 3000);
+        return { success: true, message: 'Expressing frustration!' };
+      }
+
+      if (toolName === 'express_embarrassment') {
+        setIsEmbarrassed(true);
+        // Reset after 2 seconds
+        setTimeout(() => setIsEmbarrassed(false), 2000);
+        return { success: true, message: 'Expressing embarrassment!' };
+      }
+
+      if (toolName === 'express_excitement') {
+        setIsExcited(true);
+        // Reset after 1.5 seconds
+        setTimeout(() => setIsExcited(false), 1500);
+        return { success: true, message: 'Expressing excitement!' };
+      }
+
+      if (toolName === 'express_sadness') {
+        setIsSad(true);
+        // Reset after 4 seconds
+        setTimeout(() => setIsSad(false), 4000);
+        return { success: true, message: 'Expressing sadness!' };
+      }
+
       return { success: false, message: 'Unknown tool' };
     }
   });
@@ -43,7 +85,14 @@ export default function Home() {
     <div className="min-h-screen bg-white font-sans overflow-hidden">
       <main className="relative w-full h-screen">
         {/* Particle Orb - Full screen canvas */}
-        <ParticleOrb audioLevel={audioLevel} color={orbColor} />
+        <ParticleOrb
+          audioLevel={audioLevel}
+          colors={orbColors}
+          isFrustrated={isFrustrated}
+          isEmbarrassed={isEmbarrassed}
+          isExcited={isExcited}
+          isSad={isSad}
+        />
 
         {/* Controls Overlay */}
         <div className="absolute bottom-8 left-1/2 transform -translate-x-1/2 flex flex-col items-center gap-4" style={{ zIndex: 10 }}>

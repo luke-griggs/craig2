@@ -6,10 +6,14 @@ import { SimplexNoise } from "three/examples/jsm/math/SimplexNoise.js";
 
 interface ParticleOrbProps {
   audioLevel: number; // 0 to 1
-  color?: string; // hex color string like "#ff0000"
+  colors?: string[]; // array of hex color strings for gradient
+  isFrustrated?: boolean; // whether Craig is frustrated
+  isEmbarrassed?: boolean; // whether Craig is embarrassed
+  isExcited?: boolean; // whether Craig is excited
+  isSad?: boolean; // whether Craig is sad
 }
 
-export default function ParticleOrb({ audioLevel, color = "#000000" }: ParticleOrbProps) {
+export default function ParticleOrb({ audioLevel, colors = ["#000000"], isFrustrated = false, isEmbarrassed = false, isExcited = false, isSad = false }: ParticleOrbProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const sceneRef = useRef<THREE.Scene | null>(null);
   const particlesRef = useRef<THREE.Points | null>(null);
@@ -22,15 +26,82 @@ export default function ParticleOrb({ audioLevel, color = "#000000" }: ParticleO
   const phaseOffsetRef = useRef<Float32Array | null>(null);
   const breathOffsetRef = useRef<Float32Array | null>(null);
   const voiceResponsiveRef = useRef<Float32Array | null>(null);
+  const centerOrbiterRef = useRef<Float32Array | null>(null); // Particles that orbit the center
   const simplexRef = useRef<SimplexNoise | null>(null);
   const audioLevelRef = useRef<number>(0);
   const smoothedAudioRef = useRef<number>(0);
-  const colorRef = useRef<THREE.Color>(new THREE.Color(color));
+  const colorsRef = useRef<THREE.Color[]>(colors.map(c => new THREE.Color(c)));
+  const isFrustratedRef = useRef<boolean>(false);
+  const frustrationStartTimeRef = useRef<number>(0);
+  const isEmbarrassedRef = useRef<boolean>(false);
+  const embarrassmentStartTimeRef = useRef<number>(0);
+  const embarrassmentProgressRef = useRef<number>(0);
+  const isExcitedRef = useRef<boolean>(false);
+  const excitementStartTimeRef = useRef<number>(0);
+  const isSadRef = useRef<boolean>(false);
+  const sadnessStartTimeRef = useRef<number>(0);
 
-  // Update color when prop changes
+  // Update colors when prop changes
   useEffect(() => {
-    colorRef.current.set(color);
-  }, [color]);
+    colorsRef.current = colors.map(c => new THREE.Color(c));
+  }, [colors]);
+
+  // Update frustration state
+  useEffect(() => {
+    if (isFrustrated && !isFrustratedRef.current) {
+      // Just became frustrated
+      isFrustratedRef.current = true;
+      frustrationStartTimeRef.current = performance.now();
+
+      // Auto-reset after 3 seconds
+      setTimeout(() => {
+        isFrustratedRef.current = false;
+      }, 3000);
+    }
+  }, [isFrustrated]);
+
+  // Update embarrassed state
+  useEffect(() => {
+    if (isEmbarrassed && !isEmbarrassedRef.current) {
+      // Just became embarrassed
+      isEmbarrassedRef.current = true;
+      embarrassmentStartTimeRef.current = performance.now();
+      embarrassmentProgressRef.current = 0;
+
+      // Auto-reset after 2 seconds (shrinking duration)
+      setTimeout(() => {
+        isEmbarrassedRef.current = false;
+      }, 2000);
+    }
+  }, [isEmbarrassed]);
+
+  // Update excited state
+  useEffect(() => {
+    if (isExcited && !isExcitedRef.current) {
+      // Just became excited
+      isExcitedRef.current = true;
+      excitementStartTimeRef.current = performance.now();
+
+      // Auto-reset after 1.5 seconds (quick spin duration)
+      setTimeout(() => {
+        isExcitedRef.current = false;
+      }, 1500);
+    }
+  }, [isExcited]);
+
+  // Update sad state
+  useEffect(() => {
+    if (isSad && !isSadRef.current) {
+      // Just became sad
+      isSadRef.current = true;
+      sadnessStartTimeRef.current = performance.now();
+
+      // Auto-reset after 4 seconds
+      setTimeout(() => {
+        isSadRef.current = false;
+      }, 4000);
+    }
+  }, [isSad]);
 
   useEffect(() => {
     const container = containerRef.current;
@@ -88,6 +159,7 @@ export default function ParticleOrb({ audioLevel, color = "#000000" }: ParticleO
     const phaseOffsets = new Float32Array(particleCount);
     const breathOffsets = new Float32Array(particleCount);
     const voiceResponsive = new Float32Array(particleCount);
+    const centerOrbiters = new Float32Array(particleCount); // 1.0 if orbits center, 0.0 otherwise
 
     const radius = 1.75;
     const shellBias = 0.75;
@@ -181,6 +253,7 @@ export default function ParticleOrb({ audioLevel, color = "#000000" }: ParticleO
       phaseOffsets[i] = Math.random() * Math.PI * 2;
       breathOffsets[i] = Math.random() * Math.PI * 2;
       voiceResponsive[i] = Math.random() < 0.3 ? 1.0 : 0.0; // 30% of particles respond to voice
+      centerOrbiters[i] = Math.random() < 0.02 ? 1.0 : 0.0; // 2% of particles orbit the center
     }
 
     geometry.setAttribute("position", new THREE.BufferAttribute(positions, 3));
@@ -195,6 +268,7 @@ export default function ParticleOrb({ audioLevel, color = "#000000" }: ParticleO
     phaseOffsetRef.current = phaseOffsets;
     breathOffsetRef.current = breathOffsets;
     voiceResponsiveRef.current = voiceResponsive;
+    centerOrbiterRef.current = centerOrbiters;
     simplexRef.current = new SimplexNoise();
 
     const material = new THREE.PointsMaterial({
@@ -238,11 +312,49 @@ export default function ParticleOrb({ audioLevel, color = "#000000" }: ParticleO
         const ampArray = orbitAmpRef.current!;
         const phaseArray = phaseOffsetRef.current!;
         const breathArray = breathOffsetRef.current!;
+        const centerOrbiterArray = centerOrbiterRef.current!;
 
         const elapsed = clock.getElapsedTime();
 
-        // Get current color
-        const currentColor = colorRef.current;
+        // Get current colors
+        const currentColors = colorsRef.current;
+
+        // Check if frustrated
+        const frustrated = isFrustratedRef.current;
+        const frustrationIntensity = frustrated
+          ? Math.max(0, 1 - (performance.now() - frustrationStartTimeRef.current) / 3000)
+          : 0;
+
+        // Check if embarrassed - smooth animation over 2 seconds
+        const embarrassed = isEmbarrassedRef.current;
+        const embarrassmentDuration = 2000; // 2 seconds
+        const embarrassmentElapsed = embarrassed
+          ? Math.min(embarrassmentDuration, performance.now() - embarrassmentStartTimeRef.current)
+          : 0;
+        // Smooth ease-in-out curve for shrinking
+        const embarrassmentProgress = embarrassed
+          ? Math.sin((embarrassmentElapsed / embarrassmentDuration) * Math.PI * 0.5) // Ease-in using sine
+          : 0;
+
+        // Check if excited - quick spin over 1.5 seconds
+        const excited = isExcitedRef.current;
+        const excitementDuration = 1500; // 1.5 seconds
+        const excitementElapsed = excited
+          ? Math.min(excitementDuration, performance.now() - excitementStartTimeRef.current)
+          : 0;
+        const excitementIntensity = excited
+          ? 1 - (excitementElapsed / excitementDuration) // Linear fade out
+          : 0;
+
+        // Check if sad - lasts 4 seconds
+        const sad = isSadRef.current;
+        const sadnessDuration = 4000; // 4 seconds
+        const sadnessElapsed = sad
+          ? Math.min(sadnessDuration, performance.now() - sadnessStartTimeRef.current)
+          : 0;
+        const sadnessIntensity = sad
+          ? 1 - (sadnessElapsed / sadnessDuration) // Linear fade out
+          : 0;
 
         // Smooth audio level transitions with easing for more organic movement
         const targetAudio = Math.min(1, audioLevelRef.current * 1.5);
@@ -260,13 +372,20 @@ export default function ParticleOrb({ audioLevel, color = "#000000" }: ParticleO
         const expansionAmount = 0.12; // 12% expansion at max volume
         const globalBreathingScale = baseExpansion + (audioBoost * expansionAmount);
 
-        const flowSpeed = 0.18;
-        const displacementStrength = 0.45;
-        const pullStrength = 0.1;
-        const swirlStrength = 0.004;
+        // Add frustration modifiers (reduced intensity)
+        const frustrationNoise = frustrationIntensity * 1.2;
+        const frustrationSpeed = frustrationIntensity * 0.8;
+
+        // Add sadness velocity reduction (40% slower)
+        const sadnessVelocityMultiplier = sad ? 0.6 : 1.0; // 40% reduction = 0.6 multiplier
+
+        const flowSpeed = (0.18 + frustrationSpeed) * sadnessVelocityMultiplier;
+        const displacementStrength = 0.45 + frustrationNoise;
+        const pullStrength = 0.1 * sadnessVelocityMultiplier;
+        const swirlStrength = (0.004 + (frustrationIntensity * 0.01)) * sadnessVelocityMultiplier;
         const maxRadius = radius * 1.4;
-        const currentStrength = 0.012;
-        const layerStrength = 0.04;
+        const currentStrength = (0.012 + (frustrationIntensity * 0.02)) * sadnessVelocityMultiplier;
+        const layerStrength = (0.04 + (frustrationIntensity * 0.08)) * sadnessVelocityMultiplier;
 
         for (let i = 0; i < particleCount; i++) {
           const idx = i * 3;
@@ -328,6 +447,25 @@ export default function ParticleOrb({ audioLevel, color = "#000000" }: ParticleO
           positionArray[idx + 1] += curveY * orbitScale;
           positionArray[idx + 2] += curveZ * orbitScale;
 
+          // Center orbital motion for ~5% of particles
+          if (centerOrbiterArray[i] > 0.5) {
+            // Calculate orbital position around the center (0, 0, 0)
+            const orbitRadius = 0.8 + Math.sin(elapsed * 0.3 + phaseArray[i]) * 0.2; // Varying radius
+            const orbitAngle = elapsed * speedArray[i] * 0.5 + phaseArray[i];
+            const verticalAngle = Math.sin(elapsed * 0.2 + phaseArray[i]) * 0.5; // Vertical oscillation
+
+            // Create circular orbital path with vertical variation
+            const orbitX = Math.cos(orbitAngle) * orbitRadius * Math.cos(verticalAngle);
+            const orbitY = Math.sin(orbitAngle) * orbitRadius * Math.cos(verticalAngle);
+            const orbitZ = Math.sin(verticalAngle) * orbitRadius * 0.6;
+
+            // Blend the orbital motion with existing position (smooth transition)
+            const orbitBlend = 0.6; // How much orbital motion overrides natural position
+            positionArray[idx] = positionArray[idx] * (1 - orbitBlend) + orbitX * orbitBlend;
+            positionArray[idx + 1] = positionArray[idx + 1] * (1 - orbitBlend) + orbitY * orbitBlend;
+            positionArray[idx + 2] = positionArray[idx + 2] * (1 - orbitBlend) + orbitZ * orbitBlend;
+          }
+
           // Layered noise currents to create dense, mesmerising flows
           const flowNoise1 = simplex.noise4d(
             bx * 0.7 + nx,
@@ -372,9 +510,53 @@ export default function ParticleOrb({ audioLevel, color = "#000000" }: ParticleO
 
           // Apply global breathing expansion uniformly from center
           // This creates the cohesive expand/contract effect
-          positionArray[idx] *= globalBreathingScale;
-          positionArray[idx + 1] *= globalBreathingScale;
-          positionArray[idx + 2] *= globalBreathingScale;
+          let finalScale = globalBreathingScale;
+
+          // Apply embarrassment shrinking effect
+          if (embarrassed) {
+            // Shrink down to 15% of original size
+            const shrinkTarget = 0.15;
+            const shrinkAmount = 1 - (1 - shrinkTarget) * embarrassmentProgress;
+            finalScale *= shrinkAmount;
+          }
+
+          // Apply excitement - form particles into a spinning ring
+          if (excited && excitementIntensity > 0) {
+            // Blend from current position to ring formation
+            const ringRadius = 1.5;
+            const ringThickness = 0.2;
+
+            // Calculate angle around the ring based on particle index
+            const angleAroundRing = (i / particleCount) * Math.PI * 2;
+
+            // Add some variation in the ring thickness
+            const radialOffset = (Math.sin(i * 0.1) * 0.5 + 0.5) * ringThickness;
+            const actualRadius = ringRadius + radialOffset;
+
+            // Target position on ring
+            const targetX = Math.cos(angleAroundRing) * actualRadius;
+            const targetY = (Math.sin(i * 0.5) * 0.5) * ringThickness; // Slight vertical variation
+            const targetZ = Math.sin(angleAroundRing) * actualRadius;
+
+            // Blend current position with ring position
+            const blendFactor = 0.8; // How much to form the ring
+            positionArray[idx] = positionArray[idx] * (1 - blendFactor) + targetX * blendFactor;
+            positionArray[idx + 1] = positionArray[idx + 1] * (1 - blendFactor) + targetY * blendFactor;
+            positionArray[idx + 2] = positionArray[idx + 2] * (1 - blendFactor) + targetZ * blendFactor;
+
+            // Now apply spinning rotation to the ring
+            const spinSpeed = 6.0; // Fast spin
+            const spinAngle = elapsed * spinSpeed;
+
+            const ringX = positionArray[idx];
+            const ringZ = positionArray[idx + 2];
+            positionArray[idx] = ringX * Math.cos(spinAngle) - ringZ * Math.sin(spinAngle);
+            positionArray[idx + 2] = ringX * Math.sin(spinAngle) + ringZ * Math.cos(spinAngle);
+          }
+
+          positionArray[idx] *= finalScale;
+          positionArray[idx + 1] *= finalScale;
+          positionArray[idx + 2] *= finalScale;
 
           const finalX = positionArray[idx];
           const finalY = positionArray[idx + 1];
@@ -391,10 +573,16 @@ export default function ParticleOrb({ audioLevel, color = "#000000" }: ParticleO
           }
 
           // Update particle color with subtle variation
+          // For multi-color, use gradient based on particle position
+          const colorIndex = currentColors.length === 1
+            ? 0
+            : Math.floor((i / particleCount) * currentColors.length) % currentColors.length;
+          const particleColor = currentColors[colorIndex];
+
           const shade = 0.8 + Math.random() * 0.2; // Multiply by 0.8-1.0 for variation
-          colorArray[idx] = currentColor.r * shade;
-          colorArray[idx + 1] = currentColor.g * shade;
-          colorArray[idx + 2] = currentColor.b * shade;
+          colorArray[idx] = particleColor.r * shade;
+          colorArray[idx + 1] = particleColor.g * shade;
+          colorArray[idx + 2] = particleColor.b * shade;
         }
 
         particles.geometry.attributes.position.needsUpdate = true;
