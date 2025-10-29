@@ -1,16 +1,49 @@
 'use client';
 
+import { useState } from 'react';
 import { useRealtimeVoice } from './hooks/useRealtimeVoice';
 import ParticleOrb from './components/ParticleOrb';
 
+const COLOR_MAP: Record<string, string> = {
+  red: '#ff0000',
+  blue: '#0000ff',
+  green: '#00ff00',
+  purple: '#9b59b6',
+  orange: '#ff8c00',
+  yellow: '#ffff00',
+  pink: '#ff69b4',
+  cyan: '#00ffff',
+  white: '#ffffff',
+  black: '#000000',
+  magenta: '#ff00ff',
+  lime: '#00ff00',
+  indigo: '#4b0082',
+  violet: '#ee82ee',
+  teal: '#008080',
+  gold: '#ffd700',
+  silver: '#c0c0c0',
+};
+
 export default function Home() {
-  const { isConnected, isConnecting, audioLevel, error, connect, disconnect } = useRealtimeVoice();
+  const [orbColor, setOrbColor] = useState('#000000');
+
+  const { isConnected, isConnecting, audioLevel, error, connect, disconnect } = useRealtimeVoice({
+    onToolCall: (toolName, args) => {
+      if (toolName === 'change_orb_color') {
+        const colorName = args.color.toLowerCase();
+        const hexColor = COLOR_MAP[colorName] || args.color;
+        setOrbColor(hexColor);
+        return { success: true, message: `Changed orb color to ${args.color}` };
+      }
+      return { success: false, message: 'Unknown tool' };
+    }
+  });
 
   return (
     <div className="min-h-screen bg-white font-sans overflow-hidden">
       <main className="relative w-full h-screen">
         {/* Particle Orb - Full screen canvas */}
-        <ParticleOrb audioLevel={audioLevel} />
+        <ParticleOrb audioLevel={audioLevel} color={orbColor} />
 
         {/* Controls Overlay */}
         <div className="absolute bottom-8 left-1/2 transform -translate-x-1/2 flex flex-col items-center gap-4" style={{ zIndex: 10 }}>

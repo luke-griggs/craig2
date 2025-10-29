@@ -6,9 +6,10 @@ import { SimplexNoise } from "three/examples/jsm/math/SimplexNoise.js";
 
 interface ParticleOrbProps {
   audioLevel: number; // 0 to 1
+  color?: string; // hex color string like "#ff0000"
 }
 
-export default function ParticleOrb({ audioLevel }: ParticleOrbProps) {
+export default function ParticleOrb({ audioLevel, color = "#000000" }: ParticleOrbProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const sceneRef = useRef<THREE.Scene | null>(null);
   const particlesRef = useRef<THREE.Points | null>(null);
@@ -20,8 +21,16 @@ export default function ParticleOrb({ audioLevel }: ParticleOrbProps) {
   const orbitAmpRef = useRef<Float32Array | null>(null);
   const phaseOffsetRef = useRef<Float32Array | null>(null);
   const breathOffsetRef = useRef<Float32Array | null>(null);
+  const voiceResponsiveRef = useRef<Float32Array | null>(null);
   const simplexRef = useRef<SimplexNoise | null>(null);
   const audioLevelRef = useRef<number>(0);
+  const smoothedAudioRef = useRef<number>(0);
+  const colorRef = useRef<THREE.Color>(new THREE.Color(color));
+
+  // Update color when prop changes
+  useEffect(() => {
+    colorRef.current.set(color);
+  }, [color]);
 
   useEffect(() => {
     const container = containerRef.current;
@@ -37,7 +46,7 @@ export default function ParticleOrb({ audioLevel }: ParticleOrbProps) {
       0.1,
       1000
     );
-    camera.position.z = 3.2;
+    camera.position.z = 5;
 
     const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
     renderer.setSize(container.clientWidth, container.clientHeight);
@@ -53,10 +62,10 @@ export default function ParticleOrb({ audioLevel }: ParticleOrbProps) {
       if (!ctx) return null;
 
       const gradient = ctx.createRadialGradient(32, 32, 0, 32, 32, 32);
-      gradient.addColorStop(0, "rgba(0, 0, 0, 1)");
-      gradient.addColorStop(0.35, "rgba(0, 0, 0, 0.85)");
-      gradient.addColorStop(0.7, "rgba(0, 0, 0, 0.35)");
-      gradient.addColorStop(1, "rgba(0, 0, 0, 0)");
+      gradient.addColorStop(0, "rgba(255, 255, 255, 1)");
+      gradient.addColorStop(0.35, "rgba(255, 255, 255, 0.85)");
+      gradient.addColorStop(0.7, "rgba(255, 255, 255, 0.35)");
+      gradient.addColorStop(1, "rgba(255, 255, 255, 0)");
 
       ctx.fillStyle = gradient;
       ctx.fillRect(0, 0, 64, 64);
@@ -66,7 +75,7 @@ export default function ParticleOrb({ audioLevel }: ParticleOrbProps) {
 
     const particleTexture = createParticleTexture();
 
-    const particleCount = 10000;
+    const particleCount = 8000;
     const geometry = new THREE.BufferGeometry();
     const positions = new Float32Array(particleCount * 3);
     const colors = new Float32Array(particleCount * 3);
@@ -78,6 +87,7 @@ export default function ParticleOrb({ audioLevel }: ParticleOrbProps) {
     const orbitAmplitudes = new Float32Array(particleCount);
     const phaseOffsets = new Float32Array(particleCount);
     const breathOffsets = new Float32Array(particleCount);
+    const voiceResponsive = new Float32Array(particleCount);
 
     const radius = 1.75;
     const shellBias = 0.75;
@@ -102,11 +112,10 @@ export default function ParticleOrb({ audioLevel }: ParticleOrbProps) {
       basePositions[idx + 1] = y;
       basePositions[idx + 2] = z;
 
-      // Subtle shade variation keeps the cloud readable against white
-      const shade = Math.random() * 0.25;
-      colors[idx] = shade;
-      colors[idx + 1] = shade;
-      colors[idx + 2] = shade;
+      // Initialize with base color (will be updated dynamically)
+      colors[idx] = 0;
+      colors[idx + 1] = 0;
+      colors[idx + 2] = 0;
 
       noiseOffsets[idx] = Math.random() * 100;
       noiseOffsets[idx + 1] = Math.random() * 100;
@@ -171,6 +180,7 @@ export default function ParticleOrb({ audioLevel }: ParticleOrbProps) {
       orbitAmplitudes[i] = 0.015 + Math.random() * 0.035;
       phaseOffsets[i] = Math.random() * Math.PI * 2;
       breathOffsets[i] = Math.random() * Math.PI * 2;
+      voiceResponsive[i] = Math.random() < 0.3 ? 1.0 : 0.0; // 30% of particles respond to voice
     }
 
     geometry.setAttribute("position", new THREE.BufferAttribute(positions, 3));
@@ -184,6 +194,7 @@ export default function ParticleOrb({ audioLevel }: ParticleOrbProps) {
     orbitAmpRef.current = orbitAmplitudes;
     phaseOffsetRef.current = phaseOffsets;
     breathOffsetRef.current = breathOffsets;
+    voiceResponsiveRef.current = voiceResponsive;
     simplexRef.current = new SimplexNoise();
 
     const material = new THREE.PointsMaterial({
@@ -216,6 +227,8 @@ export default function ParticleOrb({ audioLevel }: ParticleOrbProps) {
       ) {
         const positionArray = particles.geometry.attributes.position
           .array as Float32Array;
+        const colorArray = particles.geometry.attributes.color
+          .array as Float32Array;
         const baseArray = basePositionsRef.current;
         const offsetArray = noiseOffsetsRef.current;
         const simplex = simplexRef.current;
@@ -227,14 +240,33 @@ export default function ParticleOrb({ audioLevel }: ParticleOrbProps) {
         const breathArray = breathOffsetRef.current!;
 
         const elapsed = clock.getElapsedTime();
-        const audioBoost = Math.min(1, audioLevelRef.current * 1.4);
-        const flowSpeed = 0.18 + audioBoost * 0.35;
-        const displacementStrength = 0.45 + audioBoost * 1.2;
-        const pullStrength = 0.1 + audioBoost * 0.08;
-        const swirlStrength = 0.004 + audioBoost * 0.012;
-        const maxRadius = radius * (1.25 + audioBoost * 0.35);
-        const currentStrength = 0.012 + audioBoost * 0.035;
-        const layerStrength = 0.04 + audioBoost * 0.12;
+
+        // Get current color
+        const currentColor = colorRef.current;
+
+        // Smooth audio level transitions with easing for more organic movement
+        const targetAudio = Math.min(1, audioLevelRef.current * 1.5);
+        const easingFactor = 0.08; // Responsive but smooth
+        smoothedAudioRef.current += (targetAudio - smoothedAudioRef.current) * easingFactor;
+        const rawAudioBoost = smoothedAudioRef.current;
+
+        // Apply threshold - only respond to voice above this level
+        const audioThreshold = 0.15;
+        const audioBoost = rawAudioBoost > audioThreshold ? (rawAudioBoost - audioThreshold) / (1.0 - audioThreshold) : 0;
+
+        // Global expansion scale - the cloud as a whole expands/contracts with voice
+        // This creates a unified breathing effect
+        const baseExpansion = 1.0;
+        const expansionAmount = 0.12; // 12% expansion at max volume
+        const globalBreathingScale = baseExpansion + (audioBoost * expansionAmount);
+
+        const flowSpeed = 0.18;
+        const displacementStrength = 0.45;
+        const pullStrength = 0.1;
+        const swirlStrength = 0.004;
+        const maxRadius = radius * 1.4;
+        const currentStrength = 0.012;
+        const layerStrength = 0.04;
 
         for (let i = 0; i < particleCount; i++) {
           const idx = i * 3;
@@ -256,20 +288,22 @@ export default function ParticleOrb({ audioLevel }: ParticleOrbProps) {
 
           const breathWave =
             1 +
-            Math.sin(elapsed * 0.45 + breathArray[i]) *
-              (0.08 + audioBoost * 0.2);
+            Math.sin(elapsed * 0.45 + breathArray[i]) * 0.08;
           const radialScale = breathWave + noise * displacementStrength;
-          const targetX = bx * radialScale;
-          const targetY = by * radialScale;
-          const targetZ = bz * radialScale * (1.05 + audioBoost * 0.35);
+
+          // Calculate natural flowing position (without voice)
+          const naturalX = bx * radialScale;
+          const naturalY = by * radialScale;
+          const naturalZ = bz * radialScale;
 
           const px = positionArray[idx];
           const py = positionArray[idx + 1];
           const pz = positionArray[idx + 2];
 
-          positionArray[idx] += (targetX - px) * pullStrength;
-          positionArray[idx + 1] += (targetY - py) * pullStrength;
-          positionArray[idx + 2] += (targetZ - pz) * pullStrength;
+          // Move towards natural position
+          positionArray[idx] += (naturalX - px) * pullStrength;
+          positionArray[idx + 1] += (naturalY - py) * pullStrength;
+          positionArray[idx + 2] += (naturalZ - pz) * pullStrength;
 
           // Add gentle swirling motion made more dramatic by the voice
           positionArray[idx] += -py * swirlStrength;
@@ -279,7 +313,7 @@ export default function ParticleOrb({ audioLevel }: ParticleOrbProps) {
 
           // Curved orbital motion around unique axes for each particle
           const orbitPhase = elapsed * speedArray[i] + phaseArray[i];
-          const orbitScale = ampArray[i] * (0.4 + audioBoost * 0.85);
+          const orbitScale = ampArray[i] * 0.4;
           const curveX =
             uArray[idx] * Math.sin(orbitPhase) +
             vArray[idx] * Math.cos(orbitPhase);
@@ -299,19 +333,19 @@ export default function ParticleOrb({ audioLevel }: ParticleOrbProps) {
             bx * 0.7 + nx,
             by * 0.7 + ny,
             bz * 0.7 + nz,
-            elapsed * (0.28 + audioBoost * 0.6)
+            elapsed * 0.28
           );
           const flowNoise2 = simplex.noise4d(
             bx * 1.2 + ny,
             by * 1.2 + nz,
             bz * 1.2 + nx,
-            elapsed * (0.4 + audioBoost * 0.8) + 15
+            elapsed * 0.4 + 15
           );
           const flowNoise3 = simplex.noise4d(
             bx * 0.9 + nz,
             by * 0.9 + nx,
             bz * 0.9 + ny,
-            elapsed * (0.33 + audioBoost * 0.55) + 31
+            elapsed * 0.33 + 31
           );
 
           const currentX = flowNoise2 - flowNoise1;
@@ -336,6 +370,12 @@ export default function ParticleOrb({ audioLevel }: ParticleOrbProps) {
           positionArray[idx + 2] +=
             uArray[idx + 2] * filamentNoise * layerStrength;
 
+          // Apply global breathing expansion uniformly from center
+          // This creates the cohesive expand/contract effect
+          positionArray[idx] *= globalBreathingScale;
+          positionArray[idx + 1] *= globalBreathingScale;
+          positionArray[idx + 2] *= globalBreathingScale;
+
           const finalX = positionArray[idx];
           const finalY = positionArray[idx + 1];
           const finalZ = positionArray[idx + 2];
@@ -349,18 +389,23 @@ export default function ParticleOrb({ audioLevel }: ParticleOrbProps) {
             positionArray[idx + 1] *= clamp;
             positionArray[idx + 2] *= clamp;
           }
+
+          // Update particle color with subtle variation
+          const shade = 0.8 + Math.random() * 0.2; // Multiply by 0.8-1.0 for variation
+          colorArray[idx] = currentColor.r * shade;
+          colorArray[idx + 1] = currentColor.g * shade;
+          colorArray[idx + 2] = currentColor.b * shade;
         }
 
         particles.geometry.attributes.position.needsUpdate = true;
+        particles.geometry.attributes.color.needsUpdate = true;
       }
 
       if (particles) {
         const t = clock.getElapsedTime();
-        particles.rotation.y += 0.0008 + audioLevelRef.current * 0.003;
-        particles.rotation.z +=
-          Math.sin(t * 0.12) * (0.0004 + audioLevelRef.current * 0.0015);
-        particles.rotation.x =
-          Math.sin(t * 0.08) * (0.05 + audioLevelRef.current * 0.08);
+        particles.rotation.y += 0.0008;
+        particles.rotation.z += Math.sin(t * 0.12) * 0.0004;
+        particles.rotation.x = Math.sin(t * 0.08) * 0.05;
       }
 
       renderer.render(scene, camera);

@@ -1,6 +1,11 @@
 'use client';
 
 import { useEffect, useRef, useState, useCallback } from 'react';
+import { craigPrompt } from '@/prompt'
+
+interface UseRealtimeVoiceOptions {
+  onToolCall?: (toolName: string, args: any) => { success: boolean; message: string };
+}
 
 interface UseRealtimeVoiceReturn {
   isConnected: boolean;
@@ -11,7 +16,7 @@ interface UseRealtimeVoiceReturn {
   disconnect: () => void;
 }
 
-export function useRealtimeVoice(): UseRealtimeVoiceReturn {
+export function useRealtimeVoice(options?: UseRealtimeVoiceOptions): UseRealtimeVoiceReturn {
   const [isConnected, setIsConnected] = useState(false);
   const [isConnecting, setIsConnecting] = useState(false);
   const [audioLevel, setAudioLevel] = useState(0);
@@ -23,6 +28,12 @@ export function useRealtimeVoice(): UseRealtimeVoiceReturn {
   const analyserRef = useRef<AnalyserNode | null>(null);
   const animationFrameRef = useRef<number | null>(null);
   const audioElementRef = useRef<HTMLAudioElement | null>(null);
+  const onToolCallRef = useRef(options?.onToolCall);
+
+  // Keep the ref updated with the latest callback
+  useEffect(() => {
+    onToolCallRef.current = options?.onToolCall;
+  }, [options?.onToolCall]);
 
   // Audio level monitoring
   const monitorAudioLevel = useCallback(() => {
@@ -140,7 +151,7 @@ export function useRealtimeVoice(): UseRealtimeVoiceReturn {
         const sessionUpdate = {
           type: 'session.update',
           session: {
-            instructions: 'You are a helpful and friendly voice assistant. Respond naturally and conversationally.',
+            instructions: craigPrompt,
             voice: 'alloy',
             input_audio_transcription: {
               model: 'whisper-1',
@@ -151,6 +162,23 @@ export function useRealtimeVoice(): UseRealtimeVoiceReturn {
               prefix_padding_ms: 300,
               silence_duration_ms: 500,
             },
+            tools: [
+              {
+                type: 'function',
+                name: 'change_color',
+                description: 'changes the color of Craig. Craig uses this to express his emotions',
+                parameters: {
+                  type: 'object',
+                  properties: {
+                    color: {
+                      type: 'string',
+                      description: 'The color name (e.g., "red", "blue", "green", "purple", "orange", "yellow", "pink", "cyan", "white", "black")',
+                    },
+                  },
+                  required: ['color'],
+                },
+              },
+            ],
           },
         };
 
@@ -167,6 +195,31 @@ export function useRealtimeVoice(): UseRealtimeVoiceReturn {
           if (message.type === 'error') {
             console.error('Realtime API error:', message.error);
             setError(message.error.message || 'An error occurred');
+          }
+
+          // Handle function calls
+          if (message.type === 'response.function_call_arguments.done') {
+            console.log('Function call:', message.name, message.arguments);
+
+            if (options?.onToolCall) {
+              const args = JSON.parse(message.arguments);
+              const result = options.onToolCall(message.name, args);
+
+              // Send function call result back to the API
+              dataChannel.send(JSON.stringify({
+                type: 'conversation.item.create',
+                item: {
+                  type: 'function_call_output',
+                  call_id: message.call_id,
+                  output: JSON.stringify(result),
+                },
+              }));
+
+              // Trigger response generation
+              dataChannel.send(JSON.stringify({
+                type: 'response.create',
+              }));
+            }
           }
         } catch (err) {
           console.error('Error parsing message:', err);
@@ -191,7 +244,7 @@ export function useRealtimeVoice(): UseRealtimeVoiceReturn {
 
       // Send offer to OpenAI
       console.log('Sending offer to OpenAI...');
-      const sdpResponse = await fetch(`https://api.openai.com/v1/realtime?model=gpt-4o-realtime-preview-2024-12-17`, {
+      const sdpResponse = await fetch(`https://api.openai.com/v1/realtime?model=gpt-4o-realtime-preview`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${ephemeralToken}`,
