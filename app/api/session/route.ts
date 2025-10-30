@@ -20,7 +20,7 @@ export async function GET() {
       },
       body: JSON.stringify({
         model: 'gpt-realtime-mini',
-        voice: 'alloy',
+        voice: 'echo',
       }),
     });
 
