@@ -171,7 +171,7 @@ export function useRealtimeVoice(options?: UseRealtimeVoiceOptions): UseRealtime
       console.log('Local description set');
 
       console.log('Sending offer to OpenAI...');
-      const sdpResponse = await fetch('https://api.openai.com/v1/realtime?model=gpt-realtime-mini', {
+      const sdpResponse = await fetch('https://api.openai.com/v1/realtime?model=gpt-realtime', {
         method: 'POST',
         headers: {
           Authorization: `Bearer ${ephemeralToken}`,

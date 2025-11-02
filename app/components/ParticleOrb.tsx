@@ -21,6 +21,8 @@ interface ParticleOrbProps {
   isShaking?: boolean; // whether Craig is shaking head
   isSmiling?: boolean; // whether Craig is smiling
   isFrowning?: boolean; // whether Craig is frowning
+  isDisappearing?: boolean; // whether Craig is disappearing
+  disappearDuration?: number; // duration of disappear animation in ms
 }
 
 export default function ParticleOrb({
@@ -40,6 +42,8 @@ export default function ParticleOrb({
   isShaking = false,
   isSmiling = false,
   isFrowning = false,
+  isDisappearing = false,
+  disappearDuration = 1200,
 }: ParticleOrbProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const sceneRef = useRef<THREE.Scene | null>(null);
@@ -97,6 +101,9 @@ export default function ParticleOrb({
   const smileStartTimeRef = useRef<number>(0);
   const isFrowningRef = useRef<boolean>(false);
   const frownStartTimeRef = useRef<number>(0);
+  const isDisappearingRef = useRef<boolean>(false);
+  const disappearStartTimeRef = useRef<number>(0);
+  const disappearDurationRef = useRef<number>(1200);
 
   // Update colors when prop changes - trigger smooth transition
   useEffect(() => {
@@ -151,10 +158,10 @@ export default function ParticleOrb({
       isExcitedRef.current = true;
       excitementStartTimeRef.current = performance.now();
 
-      // Auto-reset after 1.5 seconds (quick spin duration)
+      // Auto-reset after 1 second (quick spin duration)
       setTimeout(() => {
         isExcitedRef.current = false;
-      }, 1500);
+      }, 1000);
     }
   }, [isExcited]);
 
@@ -263,6 +270,17 @@ export default function ParticleOrb({
       }, 2200);
     }
   }, [isFrowning]);
+
+  useEffect(() => {
+    if (isDisappearing && !isDisappearingRef.current) {
+      isDisappearingRef.current = true;
+      disappearStartTimeRef.current = performance.now();
+      disappearDurationRef.current = disappearDuration;
+    } else if (!isDisappearing && isDisappearingRef.current) {
+      // Reset when parent sets isDisappearing to false
+      isDisappearingRef.current = false;
+    }
+  }, [isDisappearing, disappearDuration]);
 
   useEffect(() => {
     const container = containerRef.current;
@@ -557,9 +575,9 @@ export default function ParticleOrb({
             ) // Ease-in using sine
           : 0;
 
-        // Check if excited - quick spin over 1.5 seconds
+        // Check if excited - quick spin over 1 second
         const excited = isExcitedRef.current;
-        const excitementDuration = 1500; // 1.5 seconds
+        const excitementDuration = 1000; // 1 second
         const excitementElapsed = excited
           ? Math.min(
               excitementDuration,
@@ -675,6 +693,21 @@ export default function ParticleOrb({
                 (performance.now() - frownStartTimeRef.current) / frownDuration
             )
           : 0;
+
+        // Check if disappearing - particles collapse to center
+        const disappearing = isDisappearingRef.current;
+        const disappearElapsed = disappearing
+          ? Math.min(
+              disappearDurationRef.current,
+              performance.now() - disappearStartTimeRef.current
+            )
+          : 0;
+        const disappearProgress = disappearing
+          ? disappearElapsed / disappearDurationRef.current
+          : 0;
+        // Use ease-in cubic for accelerating collapse
+        const easedDisappearProgress =
+          disappearProgress * disappearProgress * disappearProgress;
 
         // Smooth audio level transitions with easing for more organic movement
         const targetAudio = Math.min(1, audioLevelRef.current * 1.5);
@@ -1018,6 +1051,25 @@ export default function ParticleOrb({
               confusionNoise3 * confusionIntensity * 0.5;
           }
 
+          // Apply disappear - collapse all particles to center point
+          if (disappearing && easedDisappearProgress > 0) {
+            // Target position is the center (0, 0, 0)
+            const targetX = 0;
+            const targetY = 0;
+            const targetZ = 0;
+
+            // Interpolate current position toward center
+            positionArray[idx] =
+              positionArray[idx] * (1 - easedDisappearProgress) +
+              targetX * easedDisappearProgress;
+            positionArray[idx + 1] =
+              positionArray[idx + 1] * (1 - easedDisappearProgress) +
+              targetY * easedDisappearProgress;
+            positionArray[idx + 2] =
+              positionArray[idx + 2] * (1 - easedDisappearProgress) +
+              targetZ * easedDisappearProgress;
+          }
+
           positionArray[idx] *= finalScale;
           positionArray[idx + 1] *= finalScale;
           positionArray[idx + 2] *= finalScale;
@@ -1047,7 +1099,8 @@ export default function ParticleOrb({
           // Check if this particle should remain gray
           const isGray = isGrayParticleRef.current?.[i] ?? 0;
           const grayColor = new THREE.Color("#424243");
-          const particleColor = isGray > 0.5 ? grayColor : currentColors[colorIndex];
+          const particleColor =
+            isGray > 0.5 ? grayColor : currentColors[colorIndex];
 
           const shade = 0.8 + Math.random() * 0.2; // Multiply by 0.8-1.0 for variation
           let r = particleColor.r * shade;
@@ -1082,22 +1135,29 @@ export default function ParticleOrb({
         particles.geometry.attributes.position.needsUpdate = true;
         particles.geometry.attributes.color.needsUpdate = true;
 
+        // Update material opacity for disappear effect
+        if (particles.material instanceof THREE.PointsMaterial) {
+          if (disappearing && easedDisappearProgress > 0) {
+            // Fade out as particles collapse
+            particles.material.opacity = 0.95 * (1 - easedDisappearProgress);
+          } else {
+            // Reset to default opacity
+            particles.material.opacity = 0.95;
+          }
+        }
+
         const baseRotX = Math.sin(elapsed * 0.08) * 0.05;
         const baseRotY = elapsed * 0.05;
         const baseRotZ = Math.sin(elapsed * 0.12) * 0.025;
 
         const nodRotation =
           nodIntensity > 0
-            ? Math.sin(elapsed * 4.5) *
-              Math.pow(nodIntensity, 0.8) *
-              0.38
+            ? Math.sin(elapsed * 4.5) * Math.pow(nodIntensity, 0.8) * 0.38
             : 0;
 
         const shakeRotation =
           shakeIntensity > 0
-            ? Math.sin(elapsed * 5.2) *
-              Math.pow(shakeIntensity, 0.85) *
-              0.45
+            ? Math.sin(elapsed * 5.2) * Math.pow(shakeIntensity, 0.85) * 0.45
             : 0;
 
         baseEuler.set(baseRotX, baseRotY, baseRotZ);

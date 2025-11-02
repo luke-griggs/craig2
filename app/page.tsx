@@ -40,6 +40,8 @@ export default function Home() {
   const [isShaking, setIsShaking] = useState(false);
   const [isSmiling, setIsSmiling] = useState(false);
   const [isFrowning, setIsFrowning] = useState(false);
+  const [isDisappearing, setIsDisappearing] = useState(false);
+  const [disappearDuration, setDisappearDuration] = useState(1200);
 
   const { isConnected, isConnecting, audioLevel, error, connect, disconnect } =
     useRealtimeVoice({
@@ -82,7 +84,7 @@ export default function Home() {
             } colors: ${colorsValue.join(", ")}`,
           };
         }
-        
+
         // don't use the messages here
         if (toolName === "anger") {
           setOrbColors(["#ff0000"]); // Red
@@ -91,29 +93,13 @@ export default function Home() {
           return { success: true };
         }
 
-        if (toolName === "frustration") {
-          setOrbColors(["#ff8c00"]); // Orange
-          setIsFrustrated(true);
-          setTimeout(() => setIsFrustrated(false), 3000);
-          return { success: true };
-        }
-
-        if (toolName === "embarrassment") {
-          setOrbColors(["#ff69b4"]); // Pink
-          setIsEmbarrassed(true);
-          setTimeout(() => setIsEmbarrassed(false), 2000);
-          return { success: true };
-        }
-
         if (toolName === "excitement") {
-          setOrbColors(["#ffff00"]); // Yellow
           setIsExcited(true);
-          setTimeout(() => setIsExcited(false), 1500);
+          setTimeout(() => setIsExcited(false), 1000);
           return { success: true };
         }
 
         if (toolName === "joy") {
-          setOrbColors(["#7fff00"]); // Lime/chartreuse
           setIsJoyful(true);
           setTimeout(() => setIsJoyful(false), 2000);
           return { success: true };
@@ -130,13 +116,6 @@ export default function Home() {
           setOrbColors(["#9b59b6"]); // Purple
           setIsConfused(true);
           setTimeout(() => setIsConfused(false), 2500);
-          return { success: true };
-        }
-
-        if (toolName === "disgust") {
-          setOrbColors(["#00ff00"]); // Green
-          setIsDisgusted(true);
-          setTimeout(() => setIsDisgusted(false), 2000);
           return { success: true };
         }
 
@@ -177,6 +156,44 @@ export default function Home() {
           return { success: true };
         }
 
+        if (toolName === "embarrassment") {
+          const shrinkDuration = 800; // How long to shrink
+          const hiddenDuration = 5000; // How long to stay hidden
+          setDisappearDuration(shrinkDuration);
+          setIsDisappearing(true);
+          // Keep isDisappearing true for shrink duration + stay hidden duration
+          setTimeout(
+            () => setIsDisappearing(false),
+            shrinkDuration + hiddenDuration
+          );
+          return { success: true };
+        }
+
+        if (toolName === "send_sms_tool") {
+          const message = getStringArg(args.message);
+          if (!message) {
+            return { success: false, message: "Missing message" };
+          }
+
+          // Call the API route to send SMS
+          fetch("/api/sms", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({ message }),
+          })
+            .then((res) => res.json())
+            .then((data) => {
+              console.log("SMS sent:", data);
+            })
+            .catch((err) => {
+              console.error("SMS error:", err);
+            });
+
+          return { success: true };
+        }
+
         return { success: false, message: "Unknown tool" };
       },
     });
@@ -202,6 +219,8 @@ export default function Home() {
           isShaking={isShaking}
           isSmiling={isSmiling}
           isFrowning={isFrowning}
+          isDisappearing={isDisappearing}
+          disappearDuration={disappearDuration}
         />
 
         {/* Controls Overlay */}
@@ -245,18 +264,12 @@ export default function Home() {
           )}
 
           {isConnected && (
-            <div className="flex flex-col items-center gap-3">
-              <div className="flex items-center gap-2 px-6 py-3 bg-green-100 text-green-800 rounded-full font-medium shadow-lg">
-                <div className="w-3 h-3 bg-green-500 rounded-full animate-pulse" />
-                Connected - Speak now
-              </div>
-              <button
-                onClick={disconnect}
-                className="px-6 py-2 bg-red-500 text-white rounded-full font-medium hover:bg-red-600 transition-colors shadow-lg"
-              >
-                End Conversation
-              </button>
-            </div>
+            <button
+              onClick={disconnect}
+              className="px-6 py-2 bg-white text-gray-900 rounded-full font-medium hover:bg-gray-100 transition-colors shadow-lg"
+            >
+              End Conversation
+            </button>
           )}
 
           {/* Audio Level Indicator */}

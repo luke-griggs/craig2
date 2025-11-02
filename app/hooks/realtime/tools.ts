@@ -5,7 +5,7 @@ export const TOOL_DEFINITIONS: SessionToolDefinition[] = [
     type: "function",
     name: "change_orb_color",
     description:
-      "Express a custom appearance by changing Craig to a single solid color.",
+      "Craig uses this tool to change to a single solid color",
     parameters: {
       type: "object",
       properties: {
@@ -20,36 +20,9 @@ export const TOOL_DEFINITIONS: SessionToolDefinition[] = [
   },
   {
     type: "function",
-    name: "set_multiple_colors",
-    description:
-      "Express a custom appearance by blending several colors in Craig.",
-    parameters: {
-      type: "object",
-      properties: {
-        colors: {
-          type: "array",
-          items: { type: "string" },
-          description: "List of colors to blend together.",
-        },
-      },
-      required: ["colors"],
-    },
-  },
-  {
-    type: "function",
     name: "anger",
     description:
-      "Express anger. Use this tool when Craig feels angry or furious.",
-    parameters: {
-      type: "object",
-      properties: {},
-    },
-  },
-  {
-    type: "function",
-    name: "frustration",
-    description:
-      "Express frustration. Use this tool when Craig feels frustrated or irritated.",
+      "Craig uses this tool when he feels angry or furious",
     parameters: {
       type: "object",
       properties: {},
@@ -59,7 +32,7 @@ export const TOOL_DEFINITIONS: SessionToolDefinition[] = [
     type: "function",
     name: "embarrassment",
     description:
-      "Use this tool when Craig feels embarrassed or self-conscious.",
+      "Craig uses this tool when he feels embarrassed or self-conscious",
     parameters: {
       type: "object",
       properties: {},
@@ -69,7 +42,7 @@ export const TOOL_DEFINITIONS: SessionToolDefinition[] = [
     type: "function",
     name: "excitement",
     description:
-      "Use this tool when Craig feels excited or energetic.",
+      "Craig uses this tool when he feels excited or energetic",
     parameters: {
       type: "object",
       properties: {},
@@ -78,46 +51,7 @@ export const TOOL_DEFINITIONS: SessionToolDefinition[] = [
   {
     type: "function",
     name: "joy",
-    description: "Use this tool when Craig feels joyful or happy.",
-    parameters: {
-      type: "object",
-      properties: {},
-    },
-  },
-  {
-    type: "function",
-    name: "sadness",
-    description: "Use this tool when Craig feels sad or down.",
-    parameters: {
-      type: "object",
-      properties: {},
-    },
-  },
-  {
-    type: "function",
-    name: "confusion",
-    description:
-      "Use this tool when Craig feels confused or puzzled.",
-    parameters: {
-      type: "object",
-      properties: {},
-    },
-  },
-  {
-    type: "function",
-    name: "disgust",
-    description:
-      "Use this tool when Craig feels disgusted or repulsed.",
-    parameters: {
-      type: "object",
-      properties: {},
-    },
-  },
-  {
-    type: "function",
-    name: "calm",
-    description:
-      "Use this tool when Craig feels calm or peaceful.",
+    description: "make your particles spin to convey joy",
     parameters: {
       type: "object",
       properties: {},
@@ -127,7 +61,7 @@ export const TOOL_DEFINITIONS: SessionToolDefinition[] = [
     type: "function",
     name: "wave",
     description:
-      "Use this tool for Craig to wave hello or goodbye.",
+      "Craig uses this tool to say hello or goodbye",
     parameters: {
       type: "object",
       properties: {},
@@ -137,7 +71,7 @@ export const TOOL_DEFINITIONS: SessionToolDefinition[] = [
     type: "function",
     name: "nod",
     description:
-      "Use this tool for Craig to nod affirmatively.",
+      "Move your particles up and down in a nodding motion",
     parameters: {
       type: "object",
       properties: {},
@@ -147,7 +81,7 @@ export const TOOL_DEFINITIONS: SessionToolDefinition[] = [
     type: "function",
     name: "shake",
     description:
-      "Use this tool for Craig to shake his head.",
+      "Shake your particles back and forth in a shaking motion",
     parameters: {
       type: "object",
       properties: {},
@@ -156,7 +90,7 @@ export const TOOL_DEFINITIONS: SessionToolDefinition[] = [
   {
     type: "function",
     name: "smile",
-    description: "Use this tool to make Craig smile.",
+    description: "Craig uses this tool to smile",
     parameters: {
       type: "object",
       properties: {},
@@ -165,10 +99,26 @@ export const TOOL_DEFINITIONS: SessionToolDefinition[] = [
   {
     type: "function",
     name: "frown",
-    description: "Use this tool to make Craig frown.",
+    description: "Craig uses this tool to frown",
     parameters: {
       type: "object",
       properties: {},
+    },
+  },
+  {
+    type: "function",
+    name: "send_sms_tool",
+    description: "Send a text message to my phone",
+    parameters: {
+      type: "object",
+      properties: {
+        message: {
+          type: "string",
+          description:
+            "The text message to deliver",
+        },
+      },
+      required: ["message"],
     },
   },
 ];
